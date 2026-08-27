@@ -12,28 +12,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Dark Modern Fintech Theme
 st.markdown("""
 <style>
-    /* Global Styles */
     .stApp {
         background-color: #0d1117;
         color: #e6edf3;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
-    /* Metric Cards Styling */
     div[data-testid="stMetric"] {
         background: linear-gradient(145deg, #161b22, #21262d);
         border: 1px solid #30363d;
         border-radius: 12px;
         padding: 16px 20px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-    div[data-testid="stMetric"]:hover {
-        border-color: #58a6ff;
-        transform: translateY(-2px);
     }
     div[data-testid="stMetricLabel"] {
         font-size: 0.85rem;
@@ -41,12 +32,10 @@ st.markdown("""
         font-weight: 500;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
         font-weight: 700;
         color: #f0f6fc;
     }
-
-    /* Custom Badges */
     .badge-pass {
         background-color: rgba(46, 160, 67, 0.15);
         color: #3fb950;
@@ -55,7 +44,6 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
-        display: inline-block;
     }
     .badge-fail {
         background-color: rgba(248, 81, 73, 0.15);
@@ -65,20 +53,7 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
-        display: inline-block;
     }
-    .badge-warn {
-        background-color: rgba(210, 153, 34, 0.15);
-        color: #d29922;
-        border: 1px solid rgba(210, 153, 34, 0.4);
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-
-    /* Primary Action Button */
     div.stButton > button:first-child {
         background: linear-gradient(180deg, #1f6feb, #238636);
         color: #ffffff;
@@ -86,38 +61,34 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
         padding: 10px 24px;
-        box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
-        transition: all 0.2s ease;
-    }
-    div.stButton > button:first-child:hover {
-        background: linear-gradient(180deg, #388bfd, #2ea043);
-        box-shadow: 0 6px 16px rgba(46, 160, 67, 0.5);
-        transform: translateY(-1px);
-    }
-
-    /* Tab Header */
-    button[data-baseweb="tab"] {
-        font-size: 15px;
-        font-weight: 600;
-        color: #8b949e;
-        padding: 10px 18px;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #58a6ff !important;
-        border-bottom-color: #58a6ff !important;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Helper Function: ดึงข้อมูลข้ามชื่อแถวที่อาจสะกดต่างกันใน yfinance
+def get_financial_item(df, keys):
+    if df is None or df.empty:
+        return None
+    for key in keys:
+        if key in df.index:
+            return df.loc[key]
+    return None
+
+def get_latest_value(series):
+    if series is not None and len(series) > 0:
+        val = series.iloc[0]
+        return float(val) if pd.notna(val) else 0.0
+    return 0.0
 
 # ==========================================
 # 2. Header & Input UI
 # ==========================================
 st.markdown("<h1 style='margin-bottom: 0px;'>⚡ Lynch & Fisher Financial Engine</h1>", unsafe_allow_html=True)
-st.caption("ระบบตรวจสอบงบการเงินอัตโนมัติ • กรองหุ้นคุณค่า • จับทุจริตบัญชี • วิเคราะห์โมเดลธุรกิจ")
+st.caption("ระบบตรวจสอบงบการเงินเชิงลึก • กรองหุ้นคุณค่า • จับทุจริตบัญชี • วิเคราะห์โมเดลธุรกิจ")
 
 col_search, col_btn = st.columns([4, 1])
 with col_search:
-    ticker = st.text_input("พิมพ์ชื่อย่อหุ้นสหรัฐฯ (เช่น META, AAPL, GOOGL, JPM, NVDA, KO):", value="META").upper().strip()
+    ticker = st.text_input("พิมพ์ชื่อย่อหุ้นสหรัฐฯ:", value="META").upper().strip()
 with col_btn:
     st.write(" ")
     st.write(" ")
@@ -136,85 +107,114 @@ if ticker:
                 st.error(f"ไม่พบข้อมูลหุ้น {ticker} กรุณาตรวจสอบตัวสะกดชื่อย่อหุ้น")
                 st.stop()
 
-            # ตรวจสอบประเภทอุตสาหกรรม
             sector = info.get("sector", "N/A")
             industry = info.get("industry", "N/A")
             is_financial = sector == "Financial Services"
 
             # ==========================================
-            # 3. Calculation Engine
+            # 3. Precision Financial Calculations
             # ==========================================
-            # 3.1 Valuation Metrics
+            # 3.1 ดึงซีรีส์ข้อมูลด้วย Helper
+            rev_series = get_financial_item(inc, ["Total Revenue", "Operating Revenue", "TotalRevenue"])
+            ni_series = get_financial_item(inc, ["Net Income", "Net Income Common Stockholders", "NetIncome"])
+            op_inc_series = get_financial_item(inc, ["Operating Income", "Operating Profit", "Total Operating Income As Reported"])
+            rd_series = get_financial_item(inc, ["Research And Development", "Research Development"])
+            shares_series = get_financial_item(inc, ["Diluted Average Shares", "Diluted Weighted Average Shares"])
+
+            cash_series = get_financial_item(bs, ["Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents", "Cash Financial"])
+            sec_series = get_financial_item(bs, ["Other Short Term Investments", "Marketable Securities"])
+            debt_series = get_financial_item(bs, ["Total Debt", "Long Term Debt And Capital Lease Obligation"])
+            ar_series = get_financial_item(bs, ["Accounts Receivable", "Receivables", "Gross Accounts Receivable"])
+            inv_series = get_financial_item(bs, ["Inventory", "Inventories"])
+
+            ocf_series = get_financial_item(cf, ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"])
+            fcf_series = get_financial_item(cf, ["Free Cash Flow"])
+            sbc_series = get_financial_item(cf, ["Stock Based Compensation", "Stock-Based Compensation"])
+
+            # 3.2 แปลงค่าล่าสุด
+            total_rev = get_latest_value(rev_series)
+            net_income = get_latest_value(ni_series)
+            op_income = get_latest_value(op_inc_series)
+            rd_exp = get_latest_value(rd_series)
+            
+            # รวมเงินสดแท้จริง (Cash + Short Term Investments)
+            pure_cash = get_latest_value(cash_series)
+            short_inv = get_latest_value(sec_series)
+            total_cash_calc = pure_cash if (pure_cash > 0 and pure_cash >= (pure_cash + short_inv)) else (pure_cash + short_inv)
+            if total_cash_calc == 0:
+                total_cash_calc = info.get("totalCash", 0)
+
+            total_debt_calc = get_latest_value(debt_series)
+            if total_debt_calc == 0:
+                total_debt_calc = info.get("totalDebt", 0)
+
+            net_cash = total_cash_calc - total_debt_calc
+            shares_out = info.get("sharesOutstanding", 1)
+            net_cash_per_share = net_cash / shares_out if shares_out else 0
+
+            # 3.3 คำนวณ Margins & Ratios
+            op_margin = (op_income / total_rev * 100) if total_rev > 0 else (info.get("operatingMargins", 0) * 100)
+            gross_margin = info.get("grossMargins", 0) * 100
+            net_margin = (net_income / total_rev * 100) if total_rev > 0 else (info.get("profitMargins", 0) * 100)
+            roe = info.get("returnOnEquity", 0) * 100
+            roa = info.get("returnOnAssets", 0) * 100
             peg = info.get("pegRatio", None)
             pe_trailing = info.get("trailingPE", None)
             pe_forward = info.get("forwardPE", None)
             pb_ratio = info.get("priceToBook", None)
+            de_ratio = info.get("debtToEquity", 0)
             dividend_yield = info.get("dividendYield", 0) * 100 if info.get("dividendYield") else 0
             market_cap = info.get("marketCap", 0)
 
-            # 3.2 Balance Sheet & Cash Metrics
-            cash = info.get("totalCash", 0)
-            debt = info.get("totalDebt", 0)
-            net_cash = cash - debt
-            shares_out = info.get("sharesOutstanding", 1)
-            net_cash_per_share = net_cash / shares_out if shares_out else 0
-            de_ratio = info.get("debtToEquity", 0)
-
-            # 3.3 Profitability & Quality (Fisher)
-            op_margin = info.get("operatingMargins", 0) * 100
-            gross_margin = info.get("grossMargins", 0) * 100
-            net_margin = info.get("profitMargins", 0) * 100
-            roe = info.get("returnOnEquity", 0) * 100
-            roa = info.get("returnOnAssets", 0) * 100
-
-            # 3.4 Growth & R&D
-            rev_growth = info.get("revenueGrowth", 0) * 100
-            total_rev = inc.loc["TotalRevenue"].iloc[0] if "TotalRevenue" in inc.index else 0
-            rd_exp = inc.loc["ResearchAndDevelopment"].iloc[0] if "ResearchAndDevelopment" in inc.index else 0
             rd_ratio = (rd_exp / total_rev * 100) if total_rev > 0 else 0
 
-            # 3.5 Forensic / Red Flags
-            ocf = cf.loc["OperatingCashFlow"].iloc[0] if "OperatingCashFlow" in cf.index else 0
-            net_income = inc.loc["NetIncome"].iloc[0] if "NetIncome" in inc.index else 0
-            fcf = cf.loc["FreeCashFlow"].iloc[0] if "FreeCashFlow" in cf.index else (ocf - abs(cf.loc["CapitalExpenditure"].iloc[0] if "CapitalExpenditure" in cf.index else 0))
-            
+            # 3.4 Forensic Red Flags
+            ocf = get_latest_value(ocf_series)
+            if ocf == 0:
+                ocf = info.get("operatingCashflow", 0)
+
+            fcf = get_latest_value(fcf_series)
+            if fcf == 0:
+                fcf = info.get("freeCashflow", 0)
+
             cash_flow_divergence = (ocf < (net_income * 0.85)) and not is_financial
 
-            # Accounts Receivable YoY Growth
+            # Growth Rates (YoY)
+            rev_growth = info.get("revenueGrowth", 0) * 100
+            if rev_growth == 0 and rev_series is not None and len(rev_series) > 1:
+                r0, r1 = rev_series.iloc[0], rev_series.iloc[1]
+                rev_growth = ((r0 - r1) / abs(r1) * 100) if r1 != 0 else 0
+
             ar_growth = 0
             ar_warning = False
-            if "AccountsReceivable" in bs.index and len(bs.loc["AccountsReceivable"]) > 1:
-                ar_curr = bs.loc["AccountsReceivable"].iloc[0]
-                ar_prev = bs.loc["AccountsReceivable"].iloc[1]
-                ar_growth = ((ar_curr - ar_prev) / abs(ar_prev) * 100) if ar_prev != 0 else 0
-                ar_warning = ar_growth > (rev_growth * 1.5) and ar_growth > 10
+            if ar_series is not None and len(ar_series) > 1:
+                a0, a1 = ar_series.iloc[0], ar_series.iloc[1]
+                if pd.notna(a0) and pd.notna(a1) and a1 != 0:
+                    ar_growth = ((a0 - a1) / abs(a1) * 100)
+                    ar_warning = ar_growth > (rev_growth * 1.5) and ar_growth > 10
 
-            # Inventory YoY Growth
             inv_growth = 0
             inv_warning = False
-            has_inventory = "Inventory" in bs.index and pd.notna(bs.loc["Inventory"].iloc[0])
-            if has_inventory and len(bs.loc["Inventory"]) > 1:
-                inv_curr = bs.loc["Inventory"].iloc[0]
-                inv_prev = bs.loc["Inventory"].iloc[1]
-                if pd.notna(inv_curr) and pd.notna(inv_prev) and inv_prev != 0:
-                    inv_growth = ((inv_curr - inv_prev) / abs(inv_prev) * 100)
+            has_inventory = inv_series is not None and len(inv_series) > 0 and pd.notna(inv_series.iloc[0])
+            if has_inventory and len(inv_series) > 1:
+                i0, i1 = inv_series.iloc[0], inv_series.iloc[1]
+                if pd.notna(i0) and pd.notna(i1) and i1 != 0:
+                    inv_growth = ((i0 - i1) / abs(i1) * 100)
                     inv_warning = inv_growth > (rev_growth * 1.5) and inv_growth > 10
 
-            # Stock-Based Compensation
-            sbc = cf.loc["StockBasedCompensation"].iloc[0] if "StockBasedCompensation" in cf.index else 0
+            sbc = get_latest_value(sbc_series)
             sbc_ratio = (sbc / ocf * 100) if ocf > 0 else 0
             sbc_warning = sbc_ratio > 20 and not is_financial
 
-            # Dilution (Shares Growth)
-            dilution_warning = False
             sh_growth = 0
-            if "DilutedAverageShares" in inc.index and len(inc.loc["DilutedAverageShares"]) > 1:
-                sh_curr = inc.loc["DilutedAverageShares"].iloc[0]
-                sh_prev = inc.loc["DilutedAverageShares"].iloc[1]
-                sh_growth = ((sh_curr - sh_prev) / sh_prev * 100)
-                dilution_warning = sh_growth > 2.0
+            dilution_warning = False
+            if shares_series is not None and len(shares_series) > 1:
+                s0, s1 = shares_series.iloc[0], shares_series.iloc[1]
+                if pd.notna(s0) and pd.notna(s1) and s1 != 0:
+                    sh_growth = ((s0 - s1) / abs(s1) * 100)
+                    dilution_warning = sh_growth > 2.0
 
-            # 3.6 Peter Lynch 6-Category Classification
+            # 3.5 Lynch 6-Category Classification
             if rev_growth >= 18 and (peg and peg < 1.8):
                 lynch_category = "🚀 Fast Grower (หุ้นเติบโตเร็วระเบิด)"
                 cat_desc = "ธุรกิจเติบโตสูงสองหลัก เน้นดูว่า PEG ต่ำกว่า 1.0 และหนี้ต้องไม่สูง"
@@ -231,16 +231,15 @@ if ticker:
                 lynch_category = "💎 Asset Play (หุ้นสินทรัพย์ซ่อนเร้น)"
                 cat_desc = "มีเงินสดหรือสินทรัพย์มากกว่า 25% ของมูลค่าตลาด มีความคุ้มค่าสูง"
             else:
-                lynch_category = "⚙️ General Growth / Special Situation"
-                cat_desc = "หุ้นที่กำลังปรับโครงสร้าง หรือเติบโตเฉพาะตัวตามกลยุทธ์ของบริษัท"
+                lynch_category = "⚙️ General Growth / Stalwart"
+                cat_desc = "หุ้นพื้นฐานแข็งแกร่ง กำไรเติบโตสม่ำเสมอ"
 
             # ==========================================
-            # 4. Main Dashboard UI
+            # 4. Presentation UI
             # ==========================================
             st.markdown(f"## 🏢 {info.get('shortName', ticker)} `[{ticker}]`")
             st.markdown(f"**หมวดหมู่:** `{sector}` | `{industry}` | **Market Cap:** `${market_cap:,.0f}`")
 
-            # Category Banner
             with st.container(border=True):
                 c_cat1, c_cat2 = st.columns([1.5, 3])
                 with c_cat1:
@@ -248,7 +247,6 @@ if ticker:
                 with c_cat2:
                     st.write(f"💡 **คำอธิบายกลยุทธ์:** {cat_desc}")
 
-            # Top KPI Summary Cards
             col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
             with col_kpi1:
                 if is_financial:
@@ -286,67 +284,54 @@ if ticker:
             # 5. Deep-Dive Analytical Tabs
             # ==========================================
             tab_verdict, tab_redflag, tab_fisher, tab_lynch, tab_charts, tab_ai = st.tabs([
-                "🏆 สรุปการตัดเกรด (Scorecard)",
-                "🚨 ตรวจจับกลโกง & Red Flags",
+                "🏆 สรุปการตัดเกรด",
+                "🚨 ตรวจจับ Red Flags",
                 "🔬 ความได้เปรียบเชิงโครงสร้าง (Fisher)",
-                "💰 มูลค่า & ความคุ้มค่า (Lynch)",
+                "💰 มูลค่า & สุขภาพงบดุล (Lynch)",
                 "📈 กราฟแนวโน้ม 4 ปีย้อนหลัง",
                 "🤖 Prompt สำหรับส่งให้ AI"
             ])
 
-            # ----------------------------------------------------
-            # Tab 1: Verdict
-            # ----------------------------------------------------
             with tab_verdict:
-                st.markdown("### 📋 สรุปผลการประเมิน 10 ด่านตรวจ")
-                
-                # Check Logic
-                c_pass = 0
-                total_c = 6
-
-                # Evaluation points
+                st.markdown("### 📋 สรุปผลการประเมิน 6 ด่านตรวจหลัก")
                 p1 = (peg is not None and peg < 1.0) if not is_financial else (pb_ratio is not None and pb_ratio <= 1.2)
-                p2 = (net_cash > 0 or de_ratio < 50) if not is_financial else (roe >= 12)
+                p2 = (net_cash > 0 or de_ratio < 60) if not is_financial else (roe >= 12)
                 p3 = op_margin >= 15
                 p4 = not cash_flow_divergence
                 p5 = not ar_warning
                 p6 = not dilution_warning
 
                 checks = [
-                    ("1. ด้านราคาและความคุ้มค่า (Valuation Criteria)", p1, f"PEG = {peg if peg else 'N/A'}" if not is_financial else f"P/B = {pb_ratio if pb_ratio else 'N/A'}"),
-                    ("2. ด้านความปลอดภัยของฐานะการเงิน (Balance Sheet Safety)", p2, f"Net Cash = ${net_cash:,.0f}" if not is_financial else f"ROE = {roe:.1f}%"),
-                    ("3. ความสามารถในการทำกำไร (Operating Profitability)", p3, f"Operating Margin = {op_margin:.1f}% (เกณฑ์ > 15%)"),
+                    ("1. ด้านราคาและความคุ้มค่า (Valuation)", p1, f"PEG = {peg if peg else 'N/A'}" if not is_financial else f"P/B = {pb_ratio if pb_ratio else 'N/A'}"),
+                    ("2. ฐานะการเงินและสภาพคล่อง (Balance Sheet Safety)", p2, f"Net Cash = ${net_cash:,.0f}" if not is_financial else f"ROE = {roe:.1f}%"),
+                    ("3. อัตรากำไรจากการดำเนินงาน (Operating Margin)", p3, f"{op_margin:.1f}% (เกณฑ์ขั้นต่ำ > 15%)"),
                     ("4. คุณภาพกระแสเงินสด (Cash Flow Integrity)", p4, f"OCF (${ocf:,.0f}) vs Net Income (${net_income:,.0f})"),
-                    ("5. การควบคุมลูกหนี้การค้า (Receivables Control)", p5, f"AR Growth ({ar_growth:.1f}%) เทียบกับ Rev Growth ({rev_growth:.1f}%)"),
-                    ("6. การไม่เจือจางผลประโยชน์ผู้ถือหุ้น (Anti-Dilution)", p6, f"การเติบโตของจำนวนหุ้น = {sh_growth:.1f}% ต่อปี")
+                    ("5. การควบคุมลูกหนี้การค้า (Receivables Control)", p5, f"AR Growth ({ar_growth:.1f}%) vs Rev Growth ({rev_growth:.1f}%)"),
+                    ("6. จริยธรรมการไม่เจือจางหุ้น (Anti-Dilution)", p6, f"การเปลี่ยนแปลงจำนวนหุ้น = {sh_growth:+.2f}% ต่อปี")
                 ]
 
+                c_pass = 0
                 for title, passed, detail in checks:
                     with st.container(border=True):
-                        c_col1, c_col2 = st.columns([4, 1])
-                        with c_col1:
-                            st.write(f"**{title}**")
-                            st.caption(f"รายละเอียด: {detail}")
-                        with c_col2:
-                            if passed:
-                                st.markdown("<span class='badge-pass'>✅ ผ่านเกณฑ์</span>", unsafe_allow_html=True)
-                                c_pass += 1
-                            else:
-                                st.markdown("<span class='badge-fail'>❌ ไม่ผ่าน</span>", unsafe_allow_html=True)
+                        c1, c2 = st.columns([4, 1])
+                        c1.write(f"**{title}**")
+                        c1.caption(f"รายละเอียด: {detail}")
+                        if passed:
+                            c2.markdown("<span class='badge-pass'>✅ ผ่านเกณฑ์</span>", unsafe_allow_html=True)
+                            c_pass += 1
+                        else:
+                            c2.markdown("<span class='badge-fail'>❌ ไม่ผ่าน</span>", unsafe_allow_html=True)
 
                 st.markdown("---")
-                if c_pass == total_c:
-                    st.success("🟢 **GRADE A (OUTSTANDING):** ผ่านเกณฑ์งบการเงินทั้งหมดของทั้ง Lynch และ Fisher พร้อมสำหรับการส่งให้ AI ตรวจสอบคูเมืองทางธุรกิจ (Moat) ต่อไป")
+                if c_pass == 6:
+                    st.success("🟢 **GRADE A (OUTSTANDING):** ผ่านเกณฑ์งบการเงินทั้งหมดของ Lynch & Fisher ปลอดภัยจากสัญญาณตกแต่งบัญชี")
                 elif c_pass >= 4:
-                    st.warning(f"🟡 **GRADE B (WATCHLIST):** ผ่าน {c_pass}/{total_c} เกณฑ์ บริษัทมีคุณภาพดีแต่มีบางจุดที่ต้องเฝ้าระวัง (เช่น ราคายังไม่ถูก หรือมีภาระหนี้)")
+                    st.warning(f"🟡 **GRADE B (WATCHLIST):** ผ่าน {c_pass}/6 เกณฑ์ ธุรกิจแข็งแกร่งแต่ราคาอาจจะยังไม่เข้าเกณฑ์ถูกสุดๆ")
                 else:
-                    st.error(f"🔴 **GRADE C (HIGH RISK):** ผ่านเพียง {c_pass}/{total_c} เกณฑ์ แนะนำให้หลีกเลี่ยงหรือศึกษาข้อมูลเพิ่มเติมอย่างระมัดระวัง")
+                    st.error(f"🔴 **GRADE C (HIGH RISK):** ผ่านเพียง {c_pass}/6 เกณฑ์ ควรศึกษาเพิ่มเติมอย่างระมัดระวัง")
 
-            # ----------------------------------------------------
-            # Tab 2: Red Flags
-            # ----------------------------------------------------
             with tab_redflag:
-                st.markdown("### 🚨 ระบบตรวจสอบการตกแต่งบัญชีและสัญญาณอันตราย")
+                st.markdown("### 🚨 ระบบตรวจสอบความโปร่งใสทางบัญชี")
                 rf1, rf2 = st.columns(2)
                 with rf1:
                     with st.container(border=True):
@@ -354,42 +339,39 @@ if ticker:
                         st.write(f"- **Operating Cash Flow:** `${ocf:,.0f}`")
                         st.write(f"- **Net Income:** `${net_income:,.0f}`")
                         if cash_flow_divergence:
-                            st.error("❌ กระแสเงินสดต่ำกว่ากำไรสุทธิเกิน 15% (กำไรอาจเป็นเพียงตัวเลขตกแต่งทางบัญชี)")
+                            st.error("❌ กระแสเงินสดต่ำกว่ากำไรสุทธิเกิน 15% (ระวังกำไรตัวเลขทางบัญชี)")
                         else:
                             st.success("✅ เงินสดเข้ากระเป๋าจริงสอดคล้องกับกำไรที่รายงาน")
 
                     with st.container(border=True):
                         st.write("#### 2. ค่าตอบแทนหุ้นพนักงาน (Stock-Based Comp)")
-                        st.write(f"- **SBC ต่อเงินสดดำเนินงาน:** `{sbc_ratio:.1f}%` (เกณฑ์เตือน > 20%)")
+                        st.write(f"- **SBC ต่อเงินสดดำเนินงาน:** `{sbc_ratio:.1f}%`")
                         if sbc_warning:
-                            st.error("❌ บริษัทจ่ายผลตอบแทนด้วยการพิมพ์หุ้นแจกพนักงานสูงเกินไป ซึ่งจะลดทอนกำไรในอนาคต")
+                            st.error("❌ บริษัทพิมพ์หุ้นแจกพนักงานสูงเกิน 20% ของเงินสดดำเนินงาน")
                         else:
                             st.success("✅ สัดส่วน SBC อยู่ในระดับปลอดภัย")
 
                 with rf2:
                     with st.container(border=True):
-                        st.write("#### 3. สัญญาณยัดของ / ลูกหนี้บวม (Accounts Receivable)")
-                        st.write(f"- **การเติบโตของลูกหนี้การค้า (YoY):** `{ar_growth:.1f}%`")
-                        st.write(f"- **การเติบโตของยอดขาย (YoY):** `{rev_growth:.1f}%`")
+                        st.write("#### 3. สัญญาณลูกหนี้บวม (Accounts Receivable)")
+                        st.write(f"- **ลูกหนี้การค้าโต (YoY):** `{ar_growth:.1f}%`")
+                        st.write(f"- **ยอดขายโต (YoY):** `{rev_growth:.1f}%`")
                         if ar_warning:
-                            st.error("❌ ลูกหนี้โตเร็วกว่ายอดขายเกิน 1.5 เท่า (ระวังการเร่งรับรู้รายได้หรือเก็บเงินไม่ได้)")
+                            st.error("❌ ลูกหนี้โตเร็วกว่ายอดขายเกิน 1.5 เท่า (ระวังเก็บเงินไม่ได้)")
                         else:
                             st.success("✅ ลูกหนี้การค้าโตสัมพันธ์กับยอดขายจริง")
 
                     with st.container(border=True):
                         st.write("#### 4. สินค้าตกรุ่นค้างสต็อก (Inventory Growth)")
                         if has_inventory:
-                            st.write(f"- **การเติบโตของสินค้าคงคลัง (YoY):** `{inv_growth:.1f}%`")
+                            st.write(f"- **สินค้าคงคลังโต (YoY):** `{inv_growth:.1f}%`")
                             if inv_warning:
-                                st.error("❌ สินค้าคงคลังโตเร็วกว่ายอดขายเกิน 1.5 เท่า (เสี่ยงโดนตัดขาดทุนสต็อก)")
+                                st.error("❌ สินค้าคงคลังโตเร็วกว่ายอดขายเกิน 1.5 เท่า")
                             else:
-                                st.success("✅ บริหารจัดการสินค้าคงคลังได้ดี")
+                                st.success("✅ จัดการสินค้าคงคลังได้ดี")
                         else:
                             st.info("ℹ️ บริษัทประเภทบริการ/ซอฟต์แวร์/การเงิน ไม่มีสินค้าคงคลัง")
 
-            # ----------------------------------------------------
-            # Tab 3: Philip Fisher Deep Dive
-            # ----------------------------------------------------
             with tab_fisher:
                 st.markdown("### 🔬 ดัชนีคุณภาพและความยั่งยืน (Philip Fisher)")
                 f1, f2 = st.columns(2)
@@ -399,38 +381,27 @@ if ticker:
                         st.write(f"- **Gross Profit Margin:** `{gross_margin:.1f}%`")
                         st.write(f"- **Operating Margin:** `{op_margin:.1f}%`")
                         st.write(f"- **Net Profit Margin:** `{net_margin:.1f}%`")
-                        st.write(f"- **Return on Invested Capital (ROA):** `{roa:.1f}%`")
-                        st.caption("💡 ฟิชเชอร์ชอบบริษัทที่รักษา Operating Margin ได้สูงสม่ำเสมอแม้ในยามวิกฤต")
+                        st.write(f"- **ROA:** `{roa:.1f}%`")
 
                 with f2:
                     with st.container(border=True):
-                        st.write("#### 🔬 ความเข้มข้นของการวิจัยและนวัตกรรม (R&D)")
+                        st.write("#### 🔬 การวิจัยพัฒนา & จริยธรรมผู้บริหาร")
                         st.write(f"- **งบ R&D ประจำปี:** `${rd_exp:,.0f}`")
-                        st.write(f"- **R&D ต่อรายได้รวม:** `{rd_ratio:.1f}%`")
-                        if rd_ratio >= 10:
-                            st.success("✅ มีการลงทุนวิจัยเข้มข้นตรงสเปกหุ้นเติบโต (>10%)")
-                        else:
-                            st.info("ℹ️ การลงทุนวิจัยอยู่ในระดับปกติหรือเป็นธุรกิจที่ไม่ต้องพึ่งพาเทคโนโลยี")
-
-                    with st.container(border=True):
-                        st.write("#### 👥 จริยธรรมต่อผู้ถือหุ้น (Share Dilution)")
-                        st.write(f"- **อัตราการเปลี่ยนแปลงจำนวนหุ้น:** `{sh_growth:+.2f}% ต่อปี`")
+                        st.write(f"- **R&D ต่อยอดขาย:** `{rd_ratio:.1f}%`")
+                        st.write(f"- **การเปลี่ยนแปลงจำนวนหุ้น:** `{sh_growth:+.2f}% ต่อปี`")
                         if dilution_warning:
-                            st.error("❌ มีการออกหุ้นเพิ่มทุนทำให้สัดส่วนความเป็นเจ้าของลดลง")
+                            st.error("❌ มีการออกหุ้นเพิ่มทุนเจือจางมูลค่า")
                         else:
-                            st.success("✅ ไม่พบการเจือจางหุ้น หรือมีการซื้อหุ้นคืน (Share Buybacks) เพิ่มมูลค่า")
+                            st.success("✅ ไม่พบการเจือจางหุ้น หรือมีการซื้อหุ้นคืน (Buybacks)")
 
-            # ----------------------------------------------------
-            # Tab 4: Peter Lynch Deep Dive
-            # ----------------------------------------------------
             with tab_lynch:
                 st.markdown("### 💰 ความคุ้มค่าด้านราคาและสุขภาพงบดุล (Peter Lynch)")
                 l1, l2 = st.columns(2)
                 with l1:
                     with st.container(border=True):
                         st.write("#### 🏷️ การประเมินมูลค่า (Valuation Multiples)")
-                        st.write(f"- **Trailing P/E (กำไรย้อนหลัง):** `{pe_trailing if pe_trailing else 'N/A'}`")
-                        st.write(f"- **Forward P/E (กำไรคาดการณ์):** `{pe_forward if pe_forward else 'N/A'}`")
+                        st.write(f"- **Trailing P/E:** `{pe_trailing if pe_trailing else 'N/A'}`")
+                        st.write(f"- **Forward P/E:** `{pe_forward if pe_forward else 'N/A'}`")
                         st.write(f"- **PEG Ratio:** `{peg if peg else 'N/A'}`")
                         st.write(f"- **Price to Book (P/B):** `{pb_ratio if pb_ratio else 'N/A'}`")
                         st.write(f"- **Dividend Yield:** `{dividend_yield:.2f}%`")
@@ -438,69 +409,64 @@ if ticker:
                 with l2:
                     with st.container(border=True):
                         st.write("#### 🛡️ ป้อมปราการเงินสด (Cash & Balance Sheet)")
-                        st.write(f"- **Total Cash & Short-Term Assets:** `${cash:,.0f}`")
-                        st.write(f"- **Total Debt (หนี้สินรวม):** `${debt:,.0f}`")
-                        st.write(f"- **Net Cash (เงินสดสุทธิ):** `${net_cash:,.0f}`")
+                        st.write(f"- **เงินสด & เงินลงทุนระยะสั้น:** `${total_cash_calc:,.0f}`")
+                        st.write(f"- **หนี้สินรวม (Total Debt):** `${total_debt_calc:,.0f}`")
+                        st.write(f"- **เงินสดสุทธิ (Net Cash):** `${net_cash:,.0f}`")
                         st.write(f"- **Debt to Equity Ratio:** `{de_ratio:.1f}%`")
-                        st.write(f"- **Free Cash Flow (เงินสดอิสระ):** `${fcf:,.0f}`")
+                        st.write(f"- **Free Cash Flow:** `${fcf:,.0f}`")
 
             # ----------------------------------------------------
-            # Tab 5: 4-Year Historical Charts
+            # Tab 5: 4-Year Historical Charts (Fixed)
             # ----------------------------------------------------
             with tab_charts:
-                st.markdown("### 📈 แนวโน้มผลประกอบการย้อนหลัง 4 ปี")
+                st.markdown("### 📈 แนวโน้มผลประกอบการย้อนหลัง 4 ปี (หน่วย: พันล้านดอลลาร์ $B)")
                 try:
-                    # เตรียมข้อมูลทำกราฟย้อนหลัง
-                    hist_rev = inc.loc["TotalRevenue"] if "TotalRevenue" in inc.index else None
-                    hist_ni = inc.loc["NetIncome"] if "NetIncome" in inc.index else None
-                    hist_ocf = cf.loc["OperatingCashFlow"] if "OperatingCashFlow" in cf.index else None
+                    if rev_series is not None and ni_series is not None and len(rev_series) > 0:
+                        # สร้าง Date Index เป็นปีแบบสะอาด
+                        years = [pd.to_datetime(d).strftime('%Y') for d in rev_series.index]
+                        
+                        rev_vals = [float(v) / 1e9 if pd.notna(v) else 0.0 for v in rev_series.values]
+                        ni_vals = [float(v) / 1e9 if pd.notna(v) else 0.0 for v in ni_series.values]
+                        
+                        ocf_vals = []
+                        if ocf_series is not None and len(ocf_series) > 0:
+                            ocf_vals = [float(v) / 1e9 if pd.notna(v) else 0.0 for v in ocf_series.values]
+                        else:
+                            ocf_vals = [0.0] * len(years)
 
-                    if hist_rev is not None and hist_ni is not None:
-                        df_chart = pd.DataFrame({
-                            "Total Revenue (รายได้รวม)": hist_rev,
-                            "Net Income (กำไรสุทธิ)": hist_ni,
-                            "Operating Cash Flow (กระแสเงินสดดำเนินงาน)": hist_ocf if hist_ocf is not None else 0
-                        }).sort_index()
+                        df_plot = pd.DataFrame({
+                            "Year": years,
+                            "รายได้รวม (Revenue)": rev_vals,
+                            "กำไรสุทธิ (Net Income)": ni_vals,
+                            "เงินสดดำเนินงาน (OCF)": ocf_vals
+                        }).set_index("Year").sort_index(ascending=True)
 
-                        st.bar_chart(df_chart)
-                        st.caption("แท่งกราฟเปรียบเทียบ รายได้รวม vs กำไรสุทธิ vs เงินสดจากการดำเนินงานจริงในแต่ละปี")
+                        st.bar_chart(df_plot)
+                        st.caption("เปรียบเทียบ Revenue vs Net Income vs Operating Cash Flow ย้อนหลัง (หน่วย: พันล้านดอลลาร์)")
                     else:
                         st.info("ไม่มีข้อมูลงบย้อนหลังเพียงพอสำหรับสร้างกราฟ")
                 except Exception as chart_err:
-                    st.write(f"ไม่สามารถแสดงกราฟได้: {chart_err}")
+                    st.error(f"เกิดข้อผิดพลาดในการวาดกราฟ: {chart_err}")
 
-            # ----------------------------------------------------
-            # Tab 6: AI Scuttlebutt Prompt
-            # ----------------------------------------------------
             with tab_ai:
-                st.markdown("### 🤖 นำข้อมูลไปให้ AI ช่วยวิเคราะห์คูเมืองต่อ (One-Click Prompt)")
+                st.markdown("### 🤖 ส่งข้อมูลให้ AI วิเคราะห์ Moat & Competitors")
                 summary = info.get("longBusinessSummary", "ไม่มีข้อมูลอธิบายธุรกิจ")
                 
-                ai_prompt_text = f"""วิเคราะห์ความได้เปรียบทางการแข่งขัน (Economic Moat) และทีมผู้บริหารของบริษัทนี้อย่างละเอียด ตามหลักการ 15 ข้อของ Philip Fisher และทฤษฎีหุ้น 6 ร่างของ Peter Lynch:
+                ai_prompt_text = f"""วิเคราะห์ความได้เปรียบทางการแข่งขัน (Economic Moat) และผู้บริหารตามหลักการ Philip Fisher & Peter Lynch:
+- บริษัท: {info.get('shortName', ticker)} ({ticker})
+- กลุ่ม: {sector} / {industry}
+- Revenue Growth: {rev_growth:.1f}% | Operating Margin: {op_margin:.1f}% | R&D/Rev: {rd_ratio:.1f}%
+- Net Cash: ${net_cash:,.0f} | PEG: {peg if peg else 'N/A'}
 
-1. ข้อมูลทั่วไปของบริษัท:
-- ชื่อบริษัท: {info.get('shortName', ticker)} ({ticker})
-- อุตสาหกรรม: {sector} / {industry}
-- Market Cap: ${market_cap:,.0f}
-
-2. ตัวเลขทางการเงินสำคัญ:
-- อัตราการเติบโตของรายได้ (YoY): {rev_growth:.1f}%
-- Gross Profit Margin: {gross_margin:.1f}%
-- Operating Profit Margin: {op_margin:.1f}%
-- R&D to Revenue: {rd_ratio:.1f}%
-- PEG Ratio: {peg if peg else 'N/A'}
-- เงินสดสุทธิ (Net Cash): ${net_cash:,.0f}
-
-3. คำอธิบายโมเดลธุรกิจ:
+คำอธิบายธุรกิจ:
 {summary}
 
-คำถามที่ต้องการให้ตอบ:
-1. บริษัทนี้มี Economic Moat (คูเมืองทางธุรกิจ) ประเภทใดที่คู่แข่งรายใหม่ไม่สามารถลอกเลียนแบบได้ง่ายในอีก 5 ปีข้างหน้า?
-2. ประสิทธิภาพทีมขายและการตลาด (Sales Organization) เหนือกว่าคู่แข่งอย่างไร?
-3. สินค้าของบริษัทมีตลาดรองรับขนาดใหญ่ (Market Potential) พอที่จะขยายตัวต่อเนื่องได้อีกหลายปีหรือไม่?
-4. สรุปความเสี่ยงเชิงโครงสร้าง 3 ข้อที่ต้องจับตามอง
+คำถาม:
+1. บริษัทนี้มี Economic Moat อะไรที่คู่แข่งเจาะไม่เข้าในอีก 5 ปี?
+2. สินค้ามี Market Potential ขยายตัวต่อเนื่องได้อีกนานไหม?
+3. สรุปจุดเสี่ยงเชิงโครงสร้าง 3 ข้อ
 """
-                st.text_area("คัดลอกข้อความด้านล่างนี้ไปวางใน AI Chat ของคุณได้ทันที:", value=ai_prompt_text, height=350)
+                st.text_area("คัดลอกข้อความไปวางใน AI Chat ได้ทันที:", value=ai_prompt_text, height=300)
 
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูลของ {ticker}: {e}")
